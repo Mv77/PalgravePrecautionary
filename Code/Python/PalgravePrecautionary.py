@@ -20,7 +20,7 @@
 #
 # This notebook reproduces the figures in Christopher D. Carroll and Miles S. Kimball's entry on [Precautionary Saving and Precautionary Wealth](http://www.econ2.jhu.edu/people/ccarroll/PalgravePrecautionary.pdf) in [The New Palgrave Dictionary of Economics](https://www.palgrave.com/gp/book/9781349951888), using tools from the [Econ-ARK](https://econ-ark.org/) project.
 
-# %% {"code_folding": []}
+# %% {"code_folding": [0]}
 # Uninteresting setup of the computational environment 
 
 # !pip install econ-ark
@@ -44,7 +44,7 @@ from scipy.optimize import root_scalar
 from ipywidgets import interact, interactive, fixed, interact_manual
 import ipywidgets as widgets
 
-# %% {"code_folding": []}
+# %% {"code_folding": [0]}
 # Define parameters for two consumers,
 # a perfect foresight one and one with shocks to income
 
@@ -78,7 +78,7 @@ PFDict["TranShkStd"] = [0]
 PFDict["TranShkCount"] = 1
 
 
-# %% {"code_folding": []}
+# %% {"code_folding": [0]}
 # Create and solve problems for the two consumers
 IndShockConsumer = IndShockConsumerType(**IdiosyncDict)
 IndShockConsumer.cycles = 2 # Make this type have a two-period horizon
@@ -116,7 +116,7 @@ PFConsumer.solve()
 # $a^{**}$. This increase is the precautionary saving induced by the uncertainty 
 # around income.
 
-# %% {"code_folding": []}
+# %% {"code_folding": [0]}
 # Figure 1
 
 def uP(agent, c):
@@ -132,31 +132,22 @@ def approxOmegaP(agent):
     of wealth next period w'(a) for a grid of end of period assets using the
     fact that optimal consumption c() satisfies u'(c(m_t)) = w'_t(m_t - c(m_t))
     '''
-    # Take the end-of-period assets grid from the consumer
-    agrid = agent.aXtraGrid
-    a_min = agrid[0]
-    a_max = agrid[-1]
-    # For each a, we need to find the implied m that generates it
-    aux = lambda m: m - agent.solution[0].cFunc(m)
-    m_grid = np.array([root_scalar(lambda m: a - aux(m), x0 = a_min, x1 = a_max).root
-                       for a in agrid])
     
-    # Then we can get consumption
+    # We need some (a,omega'(a)) set of points. Invert EGM
+    
+    # Start with some grid for m. Easiest is to copy aXtraGrid
+    m_grid = agent.aXtraGrid
+    # Find consumption
     c_grid = agent.solution[0].cFunc(m_grid)
-    # And with consmption, omega, since
-    # omega prime is U' at the optimal C.
+    # Find assets after consumption
+    a_grid = m_grid - c_grid
+    # From the FOC, we know omega'(a) = u'(c) **at the optimal c's**
     omegaP_grid = uP(agent, c_grid)
     
-    # We finally interpolate
-    omegaP = interp1d(agrid, omegaP_grid, kind='cubic')
+    # With a and omega'(a) grids, we construct an interpolator
+    omegaP = interp1d(a_grid, omegaP_grid, kind='cubic')
     
     return(omegaP)
-
-def create_income_dstn(epsilon):
-    
-    # No permanent income shocks and 1+eps, 1-eps with half chance each for transitory.
-    IncomeDstn = DiscreteDistribution(np.array([0.5,0.5]),
-                                      [np.array([1,1]), np.array([1-epsilon,1+epsilon])])
 
 def create_agents(CRRA,TranShkStd):
     
@@ -181,7 +172,9 @@ def create_agents(CRRA,TranShkStd):
     
     return((IndShockConsumer, PFConsumer))
 
-def fig1(CRRA, TranShkStd, m, a_m_min, a_m_max):
+def fig1(CRRA, TranShkStd, a_m_min, a_m_max):
+    
+    m=3
     
     # Create and solve consumers
     IndShockConsumer, PFConsumer = create_agents(CRRA, TranShkStd)
@@ -232,31 +225,22 @@ def fig1(CRRA, TranShkStd, m, a_m_min, a_m_max):
 
 
 
-# %%
+# %% {"code_folding": [0]}
 # Widget
 
 # CRRA - slider
 crra_slider = widgets.FloatSlider(
                 min = 1.02,
-                max = 8,
+                max = 5,
                 step = 0.01,
                 value = 2,  # Default value
                 continuous_update=False,
                 readout_format ='.4f',
                 description='$\\rho$')
 
-# m - slider
-m_slider = widgets.FloatSlider(min = 1.00,
-                               max = 5,
-                               step = 0.5,
-                               value = 3,  # Default value
-                               continuous_update=False,
-                               readout_format ='.4f',
-                               description='$m$')
-
 # a_left_limit - slider
 a_m_min_slider = widgets.FloatSlider(min = 0.05,
-                                     max = 0.5,
+                                     max = 0.3,
                                      step = 0.01,
                                      value = 0.2,  # Default value
                                      continuous_update=False,
@@ -264,7 +248,7 @@ a_m_min_slider = widgets.FloatSlider(min = 0.05,
                                      description='$a_{\\min}/m$')
 
 # a_right_limit - slider
-a_m_max_slider = widgets.FloatSlider(min = 0.5,
+a_m_max_slider = widgets.FloatSlider(min = 0.7,
                                      max = 0.99,
                                      step = 0.01,
                                      value = 0.8,  # Default value
@@ -274,7 +258,7 @@ a_m_max_slider = widgets.FloatSlider(min = 0.5,
 
 # Shock std - slider
 TranShkStd_slider = widgets.FloatSlider(min = 0.1,
-                                        max = 5,
+                                        max = 2,
                                         step = 0.01,
                                         value = 1,  # Default value
                                         continuous_update=False,
@@ -284,7 +268,6 @@ TranShkStd_slider = widgets.FloatSlider(min = 0.1,
 interact(fig1,
          CRRA = crra_slider,
          TranShkStd = TranShkStd_slider,
-         m = m_slider,
          a_m_min = a_m_min_slider,
          a_m_max = a_m_max_slider)
 
@@ -299,7 +282,7 @@ interact(fig1,
 # 2. The difference between them vanishes as market resources approach infinity.
 # 3. Under uncertain future income, the consumption function is concave.
 
-# %% {"code_folding": []}
+# %% {"code_folding": [0]}
 # Figure 2
 def fig2(CRRA, TranShkStd, m_max):
     
@@ -340,7 +323,7 @@ def fig2(CRRA, TranShkStd, m_max):
     plt.legend()
 
 
-# %%
+# %% {"code_folding": [0]}
 # m - slider
 m_max_slider = widgets.FloatSlider(min = 5,
                                    max = 50,
@@ -348,7 +331,7 @@ m_max_slider = widgets.FloatSlider(min = 5,
                                    value = 20,  # Default value
                                    continuous_update=False,
                                    readout_format ='.4f',
-                                   description='$m$')
+                                   description='$m_{max}$')
 
 interact(fig2,
          CRRA = crra_slider,
@@ -361,7 +344,7 @@ interact(fig2,
 # %% [markdown]
 # # Figure 3
 
-# %% {"code_folding": []}
+# %% {"code_folding": [0]}
 def fig3(CRRA, eta, a):
     
     a_min = 1
@@ -442,7 +425,7 @@ def fig3(CRRA, eta, a):
     plt.legend()
 
 
-# %%
+# %% {"code_folding": [0]}
 # eta - slider
 eta_slider = widgets.FloatSlider(min = 0.0,
                                  max = 1,
